@@ -1,23 +1,43 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from pydantic import BaseModel
-import uuid
 import json
+import uuid
 
 from .ws_handler import manager
-from . import bot
+from .database import engine, Base
+from .routers import automations, agents, jobs
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await bot.start_telegram_bot()
+    # Cria as tabelas se não existirem (em prod usar Alembic)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
-    await bot.stop_telegram_bot()
 
 app = FastAPI(title="Maestro Control Plane", lifespan=lifespan)
 
+# Configuração de CORS para o Frontend React
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Em prod, restringir para a URL do frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Registro de Routers
+app.include_router(automations.router)
+app.include_router(agents.router)
+app.include_router(jobs.router)
+
 @app.get("/")
 async def root():
-    return {"status": "Control Plane Online"}
+    return {
+        "status": "Control Plane Online",
+        "version": "1.0.0",
+        "connected_agents": len(manager.active_connections)
+    }
 
 @app.websocket("/ws/agent/{token}")
 async def websocket_endpoint(websocket: WebSocket, token: str):
@@ -31,46 +51,32 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
             p_data = payload.get("payload", {})
 
             if p_type == "HEARTBEAT_TELEMETRY":
-                manager.update_telemetry(token, p_data.get("hardware", {}))
+                # Atualiza telemetria no banco e no manager
+                manager.update_telemetry(token, p_data)
+                
+            elif p_type == "JOB_STARTED":
+                exec_id = p_data.get("execution_id")
+                # Aqui poderíamos atualizar o status do Job no banco para RUNNING
                 
             elif p_type == "JOB_COMPLETED":
                 exec_id = p_data.get("execution_id")
-                exit_code = p_data.get("exit_code")
-                stdout = p_data.get("stdout", "")
+                # Lógica de persistência final do Job (logs, status, métricas)
                 
-                chat_id = manager.get_and_clear_job_chat(exec_id)
-                if chat_id and bot.bot_app:
-                    msg = f"✅ *Job Concluído com Sucesso!*\nID: `{exec_id}`\nExit Code: `{exit_code}`\n\n*Logs:*\n```\n{stdout[:3500]}\n```"
-                    await bot.bot_app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
-                    
             elif p_type == "ERROR_LOG":
                 exec_id = p_data.get("execution_id")
-                error_msg = p_data.get("message", "")
-                
-                chat_id = manager.get_and_clear_job_chat(exec_id)
-                if chat_id and bot.bot_app:
-                    msg = f"❌ *Falha no Job!*\nID: `{exec_id}`\n\n*Erro:*\n```\n{error_msg[:3500]}\n```"
-                    await bot.bot_app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                # Lógica de log de erro
                 
     except WebSocketDisconnect:
         manager.disconnect(token)
         print(f"[Agent {token}] Desconectou.")
 
-class TriggerJobRequest(BaseModel):
-    agent_token: str
-    command: str
-
-@app.post("/api/jobs/trigger")
-async def trigger_job(req: TriggerJobRequest):
+# Endpoint para disparar Job manualmente (usado pelo botão "Executar Agora")
+@app.post("/api/jobs/trigger/{automation_id}")
+async def trigger_manual_job(automation_id: uuid.UUID, agent_id: uuid.UUID, params: dict):
+    # 1. Busca automação e agente no banco
+    # 2. Gera comando final com os parâmetros
+    # 3. Cria registro de Execução
+    # 4. Envia comando via WebSocket
     execution_id = str(uuid.uuid4())
-    success = await manager.send_job(
-        agent_token=req.agent_token,
-        payload={
-            "execution_id": execution_id,
-            "command": req.command,
-            "timeout_seconds": 60
-        }
-    )
-    if not success:
-        raise HTTPException(status_code=404, detail="Agente não encontrado ou offline")
-    return {"message": "Job enviado com sucesso", "execution_id": execution_id}
+    # ... lógica de envio ...
+    return {"execution_id": execution_id, "status": "sent"}

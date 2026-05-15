@@ -1,0 +1,29 @@
+.terminalBody {
+  background-color: #0c0c0c;
+  padding: 20px;
+  min-height: 300px;
+  max-height: 500px;
+  overflow-y: auto;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.terminalBody::-webkit-scrollbar {
+  width: 8px;
+}
+
+.terminalBody::-webkit-scrollbar-track {
+  background: #000;
+}
+
+.terminalBody::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}

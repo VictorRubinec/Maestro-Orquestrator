@@ -1,0 +1,65 @@
+.loginPage {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #0a0a0a;
+  position: relative;
+  overflow: hidden;
+}
+
+.backButton {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  text-transform: none;
+  color: #598AEB !important;
+}
+
+.loginCard {
+  padding: 40px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #000000;
+  width: 100%;
+}
+
+.iconWrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background-color: rgba(89, 138, 235, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.submitBtn {
+  height: 52px;
+  font-size: 1rem;
+  background-color: #598AEB !important;
+}
+
+.loginPage::after {
+  content: '';
+  position: absolute;
+  bottom: -150px;
+  right: -150px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(89, 138, 235, 0.1) 0%, transparent 70%);
+  z-index: 0;
+  filter: blur(60px);
+}
+
+.loginPage::before {
+  content: '';
+  position: absolute;
+  top: -150px;
+  left: -150px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(74, 114, 194, 0.1) 0%, transparent 70%);
+  z-index: 0;
+  filter: blur(60px);
+}
